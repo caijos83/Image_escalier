@@ -84,7 +84,7 @@ def draw_hough_lines(img, lines, color=(0, 0, 255), thickness=2):
 def getSlope(x1,y1,x2,y2):
     if x2 == x1:
                return float('inf')
-    return (y2-y1)/(x2-x1)
+    return math.arctqn(y2-y1)/(x2-x1)
 
 def getLinesP(img,width):
     lines = cv2.HoughLinesP(img, 
