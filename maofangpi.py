@@ -1,210 +1,245 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Reconnaissance d'Escaliers par Traitement d'Image Basique
-Ce script charge une image, la convertit en niveaux de gris, applique un flou gaussien,
-effectue le seuillage avec l'algorithme d'Otsu, nettoie l'image par morphologie (ouverture et fermeture),
-détecte les contours à l'aide d'un filtre de Sobel et applique une transformée de Hough basique.
-Enfin, il affiche les différentes étapes pour visualiser le pipeline.
-"""
-
-from PIL import Image
 import numpy as np
+import matplotlib.image as mplimg
 import matplotlib.pyplot as plt
+import cv2
+import json
+import math
+import os
 
-# === 1. Fonctions de convolution et de filtre gaussien ===
 
-def convolve2d(image, kernel):
+def image_gray(image_path):
     """
-    Convolution 2D d'une image par un kernel.
+    Convertit une image couleur en niveaux de gris en utilisant la formule de luminance.
     """
-    kernel = np.flipud(np.fliplr(kernel))  # Retourner le kernel
-    m, n = kernel.shape
-    pad_h, pad_w = m // 2, n // 2
-    padded = np.pad(image, ((pad_h, pad_h), (pad_w, pad_w)), mode='constant', constant_values=0)
-    output = np.zeros_like(image, dtype=float)
+    img = mplimg.imread(image_path)
+
+    if img.dtype == np.float32 or img.dtype == np.float64:
+        img = (img * 255).astype(np.uint8)
+
+    gray_image = np.dot(img[..., :3], [0.299, 0.587, 0.114])
+
+    return gray_image.astype(np.uint8)
+
+
+def algo_otsu(image_path):
+    """
+    Applique l'algorithme de seuillage d'Otsu sur une image en niveaux de gris.
+    """
+    img = image_gray(image_path)
+
+    hist, bins = np.histogram(img.flatten(), bins=256, range=[0, 256])
+    total_pixels = img.size
+    prob = hist / total_pixels
+
+    cumulative_sum = np.cumsum(prob)
+    cumulative_mean = np.cumsum(prob * np.arange(256))
+    global_mean = cumulative_mean[-1]
+
+    max_variance = 0
+    optimal_threshold = 0
+
+    for t in range(1, 256):
+        weight_bg = cumulative_sum[t]
+        weight_fg = 1 - weight_bg
+        mean_bg = cumulative_mean[t] / weight_bg if weight_bg != 0 else 0
+        mean_fg = (cumulative_mean[-1] - cumulative_mean[t]) / weight_fg if weight_fg != 0 else 0
+        variance_inter_class = weight_bg * weight_fg * (mean_bg - mean_fg) ** 2
+
+        if variance_inter_class > max_variance:
+            max_variance = variance_inter_class
+            optimal_threshold = t
+
+    binary_image = img > optimal_threshold
+    binary_image = binary_image.astype(np.uint8) * 255  # Pour affichage OpenCV
+
+    return binary_image, img  # On retourne aussi l'image en niveaux de gris
+
+
+
+
+
+# def draw_hough_lines(img, lines, color=(0, 0, 255), thickness=2):
+    # """
+        # Dessine les segments de lignes détectés par HoughLinesP sur l'image.
+
+        # Paramètres :
+            # img (ndarray) : Image d'origine, en niveaux de gris ou en couleur.
+            # lignes (ndarray) : Résultat retourné par HoughLinesP.
+            # couleur (tuple) : Couleur des lignes tracées (par défaut : rouge en BGR).
+            # epaisseur (int) : Épaisseur des lignes (par défaut : 2).
+
+        # Retour :
+            # img_avec_lignes (ndarray) : Copie de l'image avec les lignes tracées.
+    # """
+   
+    # img_with_lines = img.copy()
+
+    # if lines is not None:
+        # for line in lines:
+            # x1, y1, x2, y2 = line[0]  
+            # cv2.line(img_with_lines, (x1, y1), (x2, y2), color, thickness)
+
+    # return img_with_lines
+
     
-    for i in range(image.shape[0]):
-        for j in range(image.shape[1]):
-            output[i, j] = np.sum(padded[i:i+m, j:j+n] * kernel)
-    return output
+def getDegree(x1, y1, x2, y2):
+    dy = y2 - y1
+    dx = x2 - x1
 
-def gaussian_kernel(size=5, sigma=1):
+    angle_rad = math.atan(dy/dx)
+
+    angle_deg = math.degrees(angle_rad)
+    
+
+    return angle_deg
+
+
+def getLinesP(img,width):
+    lines = cv2.HoughLinesP(img, 
+                        rho=1,                      # la précision en distance, en pixels
+                        theta=np.pi/180,    # la précision angulaire, détecter une fois tous les °
+                        threshold=75,         # au moins les points existent
+                        minLineLength=width/4,   
+                        maxLineGap=20)
+
+    total=0
+    nb=0
+    for line in lines:
+        x1, y1, x2, y2 = line[0]
+        degree=getDegree(x1,y1,x2,y2)
+        if abs(degree)<=75:
+            total=total+degree
+            nb=nb+1
+            
+    if nb == 0:
+        return []
+    ave = total / nb
+    ave=total/nb
+
+    linesP=[]
+
+    for line in lines:
+        x1, y1, x2, y2 = line[0]
+        degree=getDegree(x1,y1,x2,y2)
+        if abs(degree-ave)<=40:
+            linesP.append(line)
+
+    return linesP
+
+
+def get_corners_from_lines(lines):
     """
-    Génère un noyau gaussien de taille donnée et d'un sigma défini.
+    通过线段端点直接定位四个角点
+    :param lines: 线段列表，格式为 [np.array([[x1,y1,x2,y2]]), ...]
+    :return: 四个角点坐标 (top_left, top_right, bottom_left, bottom_right)
     """
-    ax = np.linspace(-(size // 2), size // 2, size)
-    xx, yy = np.meshgrid(ax, ax)
-    kernel = np.exp(-(xx**2 + yy**2) / (2. * sigma**2))
-    return kernel / np.sum(kernel)
+    # 将所有端点展平为点列表
+    all_points = []
+    for line in lines:
+        x1, y1, x2, y2 = line[0]
+        all_points.extend([(x1, y1), (x2, y2)])
 
-# === 2. Seuillage d'Otsu ===
+    # 去重处理
+    unique_points = list(set(all_points))
 
-def algo_otsu(image):
+    # 定义角落评分规则
+    def score_lt(p): return p[0] + p[1]     # 左上角评分 (x+y 最小)
+    def score_rt(p): return p[0] - p[1]     # 右上角评分 (x-y 最大)
+    def score_lb(p): return p[0] - p[1]     # 左下角评分 (x-y 最小)
+    def score_rb(p): return p[0] + p[1]     # 右下角评分 (x+y 最大)
+
+    # 找到最符合每个角落特征的点
+    top_left     = min(unique_points, key=lambda p: score_lt(p))
+    top_right    = max(unique_points, key=lambda p: score_rt(p))
+    bottom_left  = min(unique_points, key=lambda p: score_lb(p))
+    bottom_right = max(unique_points, key=lambda p: score_rb(p))
+
+    return top_left, top_right, bottom_right,bottom_left
+    
+    
+def get_rectangle_from_lines(lines):
     """
-    Algorithme d'Otsu pour déterminer le seuil optimal.
-    L'image doit être en niveaux de gris avec des valeurs [0,255].
+    Génére un quadrilatère (presque rectangle) à partir des lignes détectées sur les escaliers.
     """
-    hist, _ = np.histogram(image.flatten(), bins=256, range=(0,256))
-    total = image.size
+    points = []
+    for line in lines:
+        x1, y1, x2, y2 = line[0]
+        points.append((x1, y1))
+        points.append((x2, y2))
 
-    current_max, threshold = 0, 0
-    sum_total, sumB, weightB = 0, 0, 0
-    for i in range(256):
-        sum_total += i * hist[i]
+    # Trier les points par Y (du plus haut au plus bas)
+    points = sorted(points, key=lambda p: p[1])
 
-    for i in range(256):
-        weightB += hist[i]
-        if weightB == 0:
+    # Prendre les points les plus hauts (haut gauche et droit)
+    top_points = sorted(points[:10], key=lambda p: p[0])  # 10 plus hauts
+    top_left = top_points[0]
+    top_right = top_points[-1]
+
+    # Prendre les points les plus bas (bas gauche et droit)
+    bottom_points = sorted(points[-10:], key=lambda p: p[0])  # 10 plus bas
+    bottom_left = bottom_points[0]
+    bottom_right = bottom_points[-1]
+
+    return [top_left, top_right, bottom_right, bottom_left]
+
+
+def traiter_dossier(dossier_images, dossier_annotations):
+    os.makedirs(dossier_annotations, exist_ok=True)
+    fichiers = sorted([f for f in os.listdir(dossier_images) if f.endswith('5.jpg')])
+
+    for fichier in fichiers:
+        image_path = os.path.join(dossier_images, fichier)
+        nom_base = os.path.splitext(fichier)[0]
+        json_path = os.path.join(dossier_annotations, f"{nom_base}.json")
+
+        print(f"Traitement de {fichier}...")
+
+        binary_image, gray_img = algo_otsu(image_path)
+
+        gaussien = cv2.GaussianBlur(gray_img, (7, 7), 0)
+        contour = cv2.Canny(gaussien, 100, 180)
+        noyau = np.ones((3, 3), np.uint8)
+        dilated_contour = cv2.dilate(contour, noyau, iterations=3)
+
+        width = contour.shape[1]
+        lines = getLinesP(dilated_contour, width)
+
+        if not lines:
+            print(f"[!] Aucune ligne détectée pour {fichier}.")
             continue
-        weightF = total - weightB
-        if weightF == 0:
-            break
-        sumB += i * hist[i]
-        meanB = sumB / weightB
-        meanF = (sum_total - sumB) / weightF
-        var_between = weightB * weightF * (meanB - meanF) ** 2
-        if var_between > current_max:
-            current_max = var_between
-            threshold = i
-    return threshold
 
-# === 3. Opérations Morphologiques (Érosion, Dilatation, Ouverture, Fermeture) ===
+        points = get_corners_from_lines(lines)
 
-def dilation(binary, kernel):
-    """
-    Dilatation d'une image binaire à l'aide d'un noyau booléen.
-    """
-    kH, kW = kernel.shape
-    pad_h, pad_w = kH // 2, kW // 2
-    padded = np.pad(binary, ((pad_h, pad_h), (pad_w, pad_w)), mode='constant', constant_values=False)
-    out = np.zeros_like(binary, dtype=bool)
-    for i in range(binary.shape[0]):
-        for j in range(binary.shape[1]):
-            region = padded[i:i+kH, j:j+kW]
-            if np.any(region[kernel]):
-                out[i, j] = True
-    return out
+        #points = get_rectangle_from_lines(lines)
+        points_formatted = [[int(p[0]), int(p[1])] for p in points]
 
-def erosion(binary, kernel):
-    """
-    Érosion d'une image binaire à l'aide d'un noyau booléen.
-    """
-    kH, kW = kernel.shape
-    pad_h, pad_w = kH // 2, kW // 2
-    padded = np.pad(binary, ((pad_h, pad_h), (pad_w, pad_w)), mode='constant', constant_values=True)
-    out = np.zeros_like(binary, dtype=bool)
-    for i in range(binary.shape[0]):
-        for j in range(binary.shape[1]):
-            region = padded[i:i+kH, j:j+kW]
-            if np.all(region[kernel]):
-                out[i, j] = True
-    return out
+        annotation = {
+            "shapes": [
+                {
+                    "label": "escalier",
+                    "points": points_formatted,
+                    "shape_type": "polygon"
+                }
+            ]
+        }
 
-def opening(binary, kernel):
-    """Ouverture = Érosion puis Dilatation."""
-    return dilation(erosion(binary, kernel), kernel)
+        with open(json_path, 'w') as f:
+            json.dump(annotation, f, indent=4)
 
-def closing(binary, kernel):
-    """Fermeture = Dilatation puis Érosion."""
-    return erosion(dilation(binary, kernel), kernel)
+        print(f"Annotation sauvegardée : {json_path}")
 
-# === 4. Détection de Contours par Sobel ===
+        #Affichage pour contrôle visuel
+        # image = cv2.imread(image_path)
+        # for (x, y) in points_formatted:
+            # cv2.circle(image, (x, y), 5, (255, 0, 0), -1)  # Bleu
+        # cv2.imshow("Coins détectés", image)
+        # cv2.waitKey(500)  # Affiche pendant 0.5s
+        # cv2.destroyAllWindows()
 
-def sobel_edges(image):
-    """
-    Détecte les contours d'une image en appliquant les filtres de Sobel.
-    """
-    Kx = np.array([[-1, 0, 1],
-                   [-2, 0, 2],
-                   [-1, 0, 1]])
-    Ky = np.array([[-1, -2, -1],
-                   [ 0,  0,  0],
-                   [ 1,  2,  1]])
-    grad_x = convolve2d(image, Kx)
-    grad_y = convolve2d(image, Ky)
-    magnitude = np.sqrt(grad_x**2 + grad_y**2)
-    edge_threshold = np.percentile(magnitude, 75)
-    edges = magnitude > edge_threshold
-    return edges
 
-# === 5. Transformée de Hough (implémentation basique) ===
+# === Lancer le traitement ===
+dossier_images = "Base_Validation"
+dossier_annotations = "Annotations"
 
-def hough_transform(edges, theta_res=1, rho_res=1):
-    """
-    Applique la transformée de Hough sur une image de contours.
-    Renvoie l'accumulateur, les vecteurs d'angles et de rho.
-    """
-    rows, cols = edges.shape
-    diag_len = int(np.ceil(np.sqrt(rows**2 + cols**2)))
-    rhos = np.arange(-diag_len, diag_len + 1, rho_res)
-    thetas = np.deg2rad(np.arange(-90, 90, theta_res))
-    accumulator = np.zeros((len(rhos), len(thetas)), dtype=np.int32)
-    y_idxs, x_idxs = np.nonzero(edges)
+traiter_dossier(dossier_images, dossier_annotations)
 
-    for i in range(len(x_idxs)):
-        x = x_idxs[i]
-        y = y_idxs[i]
-        for t_idx, theta in enumerate(thetas):
-            rho = int(round(x * np.cos(theta) + y * np.sin(theta)) + diag_len)
-            accumulator[rho, t_idx] += 1
-
-    return accumulator, thetas, rhos
-
-# === 6. Pipeline Principal ===
-
-def main():
-    # 1. Chargement et Conversion en niveaux de gris
-    img = Image.open('images/86.jpg').convert('L')
-    gray = np.array(img)
-
-    # 2. Application d'un Flou Gaussien
-    kernel_gauss = gaussian_kernel(size=5, sigma=1)
-    blurred = convolve2d(gray, kernel_gauss)
-    # On convertit en uint8 pour le seuillage
-    blurred_uint8 = np.clip(blurred, 0, 255).astype(np.uint8)
-
-    # 3. Seuillage avec l'algorithme d'Otsu
-    thresh = algo_otsu(blurred_uint8)
-    binary = blurred_uint8 > thresh
-    # Inversion éventuelle : ici, on inverse pour que les objets soient à True
-    binary = np.invert(binary)
-
-    # 4. Opérations Morphologiques
-    kernel_morph = np.ones((3, 3), dtype=bool)
-    opened = opening(binary, kernel_morph)
-    closed = closing(opened, kernel_morph)
-
-    # 5. Détection de Contours avec Sobel
-    edges = sobel_edges(closed.astype(np.float32))
-
-    # 6. Transformée de Hough (détection de lignes)
-    accumulator, thetas, rhos = hough_transform(edges)
-
-    # === Visualisation des Étapes ===
-    fig, axes = plt.subplots(2, 3, figsize=(12, 8))
-    ax = axes.ravel()
-    
-    ax[0].imshow(gray, cmap='gray')
-    ax[0].set_title("Image Grise")
-    
-    ax[1].imshow(blurred_uint8, cmap='gray')
-    ax[1].set_title("Flou Gaussien")
-    
-    ax[2].imshow(binary, cmap='gray')
-    ax[2].set_title("Seuillage (Otsu)")
-    
-    ax[3].imshow(closed, cmap='gray')
-    ax[3].set_title("Morphologie (Ouverture/Fermeture)")
-    
-    ax[4].imshow(edges, cmap='gray')
-    ax[4].set_title("Contours (Sobel)")
-    
-    ax[5].imshow(accumulator, cmap='hot', aspect='auto')
-    ax[5].set_title("Transformée de Hough")
-    
-    plt.tight_layout()
-    plt.show()
-
-if __name__ == '__main__':
-    main()
