@@ -199,7 +199,7 @@ def get_corners_from_lines(lines):
 
 
 # === Main ===
-image_path = "Base_Validation\\22.jpg"
+image_path = "Base_Validation\\16.jpg"
 
 # 1. Otsu + récupération image niveaux de gris
 binary_image, gray_img = algo_otsu(image_path)
