@@ -4,7 +4,6 @@ import matplotlib.pyplot as plt
 import cv2
 import json
 import math
-import os
 
 
 def image_gray(image_path):
@@ -58,28 +57,28 @@ def algo_otsu(image_path):
 
 
 
-# def draw_hough_lines(img, lines, color=(0, 0, 255), thickness=2):
-    # """
-        # Dessine les segments de lignes détectés par HoughLinesP sur l'image.
+def draw_hough_lines(img, lines, color=(0, 0, 255), thickness=2):
+    """
+        Dessine les segments de lignes détectés par HoughLinesP sur l'image.
 
-        # Paramètres :
-            # img (ndarray) : Image d'origine, en niveaux de gris ou en couleur.
-            # lignes (ndarray) : Résultat retourné par HoughLinesP.
-            # couleur (tuple) : Couleur des lignes tracées (par défaut : rouge en BGR).
-            # epaisseur (int) : Épaisseur des lignes (par défaut : 2).
+        Paramètres :
+            img (ndarray) : Image d'origine, en niveaux de gris ou en couleur.
+            lignes (ndarray) : Résultat retourné par HoughLinesP.
+            couleur (tuple) : Couleur des lignes tracées (par défaut : rouge en BGR).
+            epaisseur (int) : Épaisseur des lignes (par défaut : 2).
 
-        # Retour :
-            # img_avec_lignes (ndarray) : Copie de l'image avec les lignes tracées.
-    # """
+        Retour :
+            img_avec_lignes (ndarray) : Copie de l'image avec les lignes tracées.
+    """
    
-    # img_with_lines = img.copy()
+    img_with_lines = img.copy()
 
-    # if lines is not None:
-        # for line in lines:
-            # x1, y1, x2, y2 = line[0]  
-            # cv2.line(img_with_lines, (x1, y1), (x2, y2), color, thickness)
+    if lines is not None:
+        for line in lines:
+            x1, y1, x2, y2 = line[0]  
+            cv2.line(img_with_lines, (x1, y1), (x2, y2), color, thickness)
 
-    # return img_with_lines
+    return img_with_lines
 
     
 def getDegree(x1, y1, x2, y2):
@@ -93,15 +92,54 @@ def getDegree(x1, y1, x2, y2):
 
     return angle_deg
 
+def get_angle(x1, y1, x2, y2):
+    angle_rad = math.atan2(y2 - y1, x2 - x1)
+    angle_deg = math.degrees(angle_rad)
+    if angle_deg < 0:
+        angle_deg += 360
+    return angle_deg
+
+def merge_similar_lines(lines, angle_threshold=5, distance_threshold=20):
+    merged = []
+    mergedLines=[]
+
+    for line in lines:
+        x1, y1, x2, y2 = line[0]
+        angle = get_angle(x1, y1, x2, y2)
+        center_x = (x1 + x2) / 2
+        center_y = (y1 + y2) / 2
+
+        matched = False
+        for group in merged:
+            g_angle, g_cx, g_cy, group_lines = group
+
+            if abs(angle - g_angle) < angle_threshold and \
+               math.hypot(center_x - g_cx, center_y - g_cy) < distance_threshold:
+                group_lines.append((x1, y1, x2, y2))
+
+                group[0] = (g_angle + angle) / 2
+                group[1] = (g_cx + center_x) / 2
+                group[2] = (g_cy + center_y) / 2
+                matched = True
+                break
+
+        if not matched:
+            merged.append([angle, center_x, center_y, [(x1, y1, x2, y2)]])
+            mergedLines.append(line)
+
+    return mergedLines
+
+def sort_lines_by_y1(lines):
+    return sorted(lines, key=lambda line: line[0][1])
 
 def getLinesP(img,width):
-    lines = cv2.HoughLinesP(img, 
+    houghLines = cv2.HoughLinesP(img, 
                         rho=1,                      # la précision en distance, en pixels
                         theta=np.pi/180,    # la précision angulaire, détecter une fois tous les °
                         threshold=75,         # au moins les points existent
-                        minLineLength=width/4,   
+                        minLineLength=width/6,   
                         maxLineGap=20)
-
+    lines=merge_similar_lines(houghLines)
     total=0
     nb=0
     for line in lines:
@@ -110,19 +148,22 @@ def getLinesP(img,width):
         if abs(degree)<=75:
             total=total+degree
             nb=nb+1
-            
     if nb == 0:
         return []
     ave = total / nb
     ave=total/nb
+    ave=total/nb
+
 
     linesP=[]
 
     for line in lines:
         x1, y1, x2, y2 = line[0]
         degree=getDegree(x1,y1,x2,y2)
-        if abs(degree-ave)<=40:
+        if abs(degree-ave)<=20:
             linesP.append(line)
+
+    linesP=sort_lines_by_y1(linesP)
 
     return linesP
 
@@ -154,92 +195,79 @@ def get_corners_from_lines(lines):
     bottom_left  = min(unique_points, key=lambda p: score_lb(p))
     bottom_right = max(unique_points, key=lambda p: score_rb(p))
 
-    return top_left, top_right, bottom_right,bottom_left
-    
-    
-def get_rectangle_from_lines(lines):
-    """
-    Génére un quadrilatère (presque rectangle) à partir des lignes détectées sur les escaliers.
-    """
-    points = []
-    for line in lines:
-        x1, y1, x2, y2 = line[0]
-        points.append((x1, y1))
-        points.append((x2, y2))
-
-    # Trier les points par Y (du plus haut au plus bas)
-    points = sorted(points, key=lambda p: p[1])
-
-    # Prendre les points les plus hauts (haut gauche et droit)
-    top_points = sorted(points[:10], key=lambda p: p[0])  # 10 plus hauts
-    top_left = top_points[0]
-    top_right = top_points[-1]
-
-    # Prendre les points les plus bas (bas gauche et droit)
-    bottom_points = sorted(points[-10:], key=lambda p: p[0])  # 10 plus bas
-    bottom_left = bottom_points[0]
-    bottom_right = bottom_points[-1]
-
-    return [top_left, top_right, bottom_right, bottom_left]
+    return top_left, top_right, bottom_left, bottom_right
 
 
-def traiter_dossier(dossier_images, dossier_annotations):
-    os.makedirs(dossier_annotations, exist_ok=True)
-    fichiers = sorted([f for f in os.listdir(dossier_images) if f.endswith('5.jpg')])
+# === Main ===
+image_path = "Base_Validation\\22.jpg"
 
-    for fichier in fichiers:
-        image_path = os.path.join(dossier_images, fichier)
-        nom_base = os.path.splitext(fichier)[0]
-        json_path = os.path.join(dossier_annotations, f"{nom_base}.json")
+# 1. Otsu + récupération image niveaux de gris
+binary_image, gray_img = algo_otsu(image_path)
 
-        print(f"Traitement de {fichier}...")
+# 2. Appliquer flou gaussien et Canny
+gaussien = cv2.GaussianBlur(gray_img, (7, 7), 0)
+contour = cv2.Canny(gaussien, 100, 180)
 
-        binary_image, gray_img = algo_otsu(image_path)
+noyau= np.ones((3, 3), np.uint8)
+dilated_contour = cv2.dilate(gaussien,noyau, iterations=4)
+closed_contour = cv2.erode(dilated_contour, noyau, iterations=3)
 
-        gaussien = cv2.GaussianBlur(gray_img, (7, 7), 0)
-        contour = cv2.Canny(gaussien, 100, 180)
-        noyau = np.ones((3, 3), np.uint8)
-        dilated_contour = cv2.dilate(contour, noyau, iterations=3)
-
-        width = contour.shape[1]
-        lines = getLinesP(dilated_contour, width)
-
-        if not lines:
-            print(f"[!] Aucune ligne détectée pour {fichier}.")
-            continue
-
-        points = get_corners_from_lines(lines)
-
-        #points = get_rectangle_from_lines(lines)
-        points_formatted = [[int(p[0]), int(p[1])] for p in points]
-
-        annotation = {
-            "shapes": [
-                {
-                    "label": "escalier",
-                    "points": points_formatted,
-                    "shape_type": "polygon"
-                }
-            ]
-        }
-
-        with open(json_path, 'w') as f:
-            json.dump(annotation, f, indent=4)
-
-        print(f"Annotation sauvegardée : {json_path}")
-
-        #Affichage pour contrôle visuel
-        # image = cv2.imread(image_path)
-        # for (x, y) in points_formatted:
-            # cv2.circle(image, (x, y), 5, (255, 0, 0), -1)  # Bleu
-        # cv2.imshow("Coins détectés", image)
-        # cv2.waitKey(500)  # Affiche pendant 0.5s
-        # cv2.destroyAllWindows()
+# 3. Redimensionner et afficher avec OpenCV
+resized_contour = cv2.resize(closed_contour, (600, 600))
+cv2.imshow("Contours closed",resized_contour)
 
 
-# === Lancer le traitement ===
-dossier_images = "Base_Validation"
-dossier_annotations = "Annotations"
+# 4.
+width = contour.shape[1]
 
-traiter_dossier(dossier_images, dossier_annotations)
+lines = getLinesP(closed_contour, width)
+
+"""
+lines = cv2.HoughLinesP(dilated_contour, 
+                        rho=1,                      # la précision en distance, en pixels
+                        theta=np.pi/180,    # la précision angulaire, détecter une fois tous les °
+                        threshold=75,         # au moins les points existent
+                        minLineLength=width/6,   
+                        maxLineGap=20)
+"""             
+         
+original_img = cv2.imread(image_path)
+imgLine = draw_hough_lines(original_img, lines)
+
+
+
+
+print("Lines found:", lines)
+if lines is not None:
+    top_left, top_right, bottom_left, bottom_right = get_corners_from_lines(lines)
+
+    print("Top Left:", top_left)
+    print("Top Right:", top_right)
+    print("Bottom Left:", bottom_left)
+    print("Bottom Right:", bottom_right)
+    for point in [top_left, top_right, bottom_left, bottom_right]:
+        cv2.circle(imgLine, point, radius=20, color=(255, 0, 0), thickness=-1)
+  
+else:
+    print("No lines detected.")
+
+
+cv2.imshow("Lines", cv2.resize(imgLine, (600, 600)))
+
+
+
+# 5. Afficher image binaire Otsu avec matplotlib
+
+plt.imshow(binary_image, cmap='gray')
+plt.title("Image binarisée - Otsu")
+plt.axis('off')
+plt.show()
+
+
+# 5. Sauvegardes
+#plt.imsave("binary_image.jpg", binary_image, cmap='gray')
+#cv2.imwrite("contours_canny_.jpg", contour)
+
+cv2.waitKey(0)
+cv2.destroyAllWindows()
 

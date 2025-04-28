@@ -129,26 +129,26 @@ def getLinesP(img,width):
 
 def get_corners_from_lines(lines):
     """
-    通过线段端点直接定位四个角点
-    :param lines: 线段列表，格式为 [np.array([[x1,y1,x2,y2]]), ...]
-    :return: 四个角点坐标 (top_left, top_right, bottom_left, bottom_right)
+    utilise les extremités des lignes pour trouver 4 points
+    :param lines:  [np.array([[x1,y1,x2,y2]]), ...]
+    :return: 4 points (top_left, top_right, bottom_left, bottom_right)
     """
-    # 将所有端点展平为点列表
+    
     all_points = []
     for line in lines:
         x1, y1, x2, y2 = line[0]
         all_points.extend([(x1, y1), (x2, y2)])
 
-    # 去重处理
+    
     unique_points = list(set(all_points))
 
-    # 定义角落评分规则
-    def score_lt(p): return p[0] + p[1]     # 左上角评分 (x+y 最小)
-    def score_rt(p): return p[0] - p[1]     # 右上角评分 (x-y 最大)
-    def score_lb(p): return p[0] - p[1]     # 左下角评分 (x-y 最小)
-    def score_rb(p): return p[0] + p[1]     # 右下角评分 (x+y 最大)
 
-    # 找到最符合每个角落特征的点
+    def score_lt(p): return p[0] + p[1]     # en haut à gauche  (x+y le plus petit)
+    def score_rt(p): return p[0] - p[1]     # en haut à droite (x-y le plus grand)
+    def score_lb(p): return p[0] - p[1]     # en bas à gauche (x-y le plus petit)
+    def score_rb(p): return p[0] + p[1]     # en bas à droite  (x+y le plus grand)
+
+   
     top_left     = min(unique_points, key=lambda p: score_lt(p))
     top_right    = max(unique_points, key=lambda p: score_rt(p))
     bottom_left  = min(unique_points, key=lambda p: score_lb(p))
@@ -185,7 +185,7 @@ def get_rectangle_from_lines(lines):
 
 def traiter_dossier(dossier_images, dossier_annotations):
     os.makedirs(dossier_annotations, exist_ok=True)
-    fichiers = sorted([f for f in os.listdir(dossier_images) if f.endswith('5.jpg')])
+    fichiers = sorted([f for f in os.listdir(dossier_images) if f.endswith('2.jpg')])
 
     for fichier in fichiers:
         image_path = os.path.join(dossier_images, fichier)
@@ -241,5 +241,5 @@ def traiter_dossier(dossier_images, dossier_annotations):
 dossier_images = "Base_Validation"
 dossier_annotations = "Annotations"
 
-traiter_dossier(dossier_images, dossier_annotations)
+# traiter_dossier(dossier_images, dossier_annotations)
 

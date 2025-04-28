@@ -116,7 +116,7 @@ def afficher_masques(image, gt_mask, pred_mask):
 #     TRAITEMENT EN LOT
 # =========================
 def traiter_dossier(dossier_images, dossier_jsons):
-    fichiers = sorted([f for f in os.listdir(dossier_images) if f.endswith('5.jpg')])
+    fichiers = sorted([f for f in os.listdir(dossier_images) if f.endswith('2.jpg')])
 
     for fichier_image in fichiers:
         nom_base = os.path.splitext(fichier_image)[0]
@@ -145,11 +145,71 @@ def traiter_dossier(dossier_images, dossier_jsons):
         afficher_masques(image, gt_mask, pred_mask)
 
 
+
+# =========================
+#   ÉVALUATION GLOBALE
+# =========================
+
+def evaluation_globale(dossier_images, dossier_jsons_gt, dossier_jsons_pred, seuil_iou=0.5):
+    """
+    Évalue globalement la détection sur un dossier complet :
+    - Calcule le pourcentage d'escaliers correctement détectés (IoU > seuil).
+    """
+
+    fichiers = sorted([f for f in os.listdir(dossier_images) if f.endswith('5.jpg')])
+
+    total_images = 0
+    escaliers_detectes = 0
+
+    for fichier_image in fichiers:
+        nom_base = os.path.splitext(fichier_image)[0]
+        chemin_image = os.path.join(dossier_images, fichier_image)
+        chemin_json_gt = os.path.join(dossier_jsons_gt, f"{nom_base}.json")     # Vérité terrain
+        chemin_json_pred = os.path.join(dossier_jsons_pred, f"{nom_base}.json") # Prédiction
+
+        if not os.path.exists(chemin_json_gt) or not os.path.exists(chemin_json_pred):
+            print(f"[!] Fichier manquant pour {fichier_image}, saut de l'image.")
+            continue
+
+        image = cv2.imread(chemin_image)
+        gt_mask = load_ground_truth_mask(chemin_json_gt, image.shape)
+        pred_mask = load_ground_truth_mask(chemin_json_pred, image.shape)
+
+        scores = calcul_metrique(gt_mask, pred_mask)
+        print(f"Résultats pour {fichier_image} :")
+        for metrique, valeur in scores.items():
+            print(f"  {metrique} : {valeur:.4f}")
+
+        afficher_masques(image, gt_mask, pred_mask)
+        iou = scores['IoU']
+
+        total_images += 1
+        if iou >= seuil_iou:
+            escaliers_detectes += 1
+
+    if total_images == 0:
+        print("[!] Aucune image évaluée.")
+        return
+
+    pourcentage = (escaliers_detectes / total_images) * 100
+    print("\n========== ÉVALUATION GLOBALE ==========")
+    print(f"Images évaluées        : {total_images}")
+    print(f"Escaliers détectés     : {escaliers_detectes}")
+    print(f"Pourcentage de détection : {pourcentage:.2f}% (avec seuil IoU > {seuil_iou})")
+    print("========================================")
+
+
 # =========================
 #         MAIN
 # =========================
 
 if __name__ == "__main__":
     dossier_images = "Base_Validation"
-    dossier_jsons = "json"
-    traiter_dossier(dossier_images, dossier_jsons)
+    dossier_jsons_gt = "json"          # Vérité terrain
+    dossier_jsons_pred = "Annotations" # Résultats de prédiction
+
+    # Génération des prédictions uniquement si besoin
+    # traiter_dossier(dossier_images, dossier_jsons_pred)
+
+    # Évaluation globale
+    evaluation_globale(dossier_images, dossier_jsons_gt, dossier_jsons_pred, seuil_iou=0.5)
