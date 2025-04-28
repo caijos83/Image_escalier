@@ -57,10 +57,16 @@ def calcul_metrique(gt_mask, pred_mask):
 
 def afficher_masques(image, gt_mask, pred_mask):
     """
-    Affiche l'image originale avec superposition semi-transparente des masques de GT et prédiction.
-    Vert : vérité terrain, Rouge : prédiction
+    Affiche l'image originale avec :
+    1. l'image seule
+    2. la vérité terrain (vert)
+    3. la prédiction (rouge)
+    4. la superposition des deux :
+       - Vert = vérité terrain correcte
+       - Rouge = prédiction incorrecte
+       - Jaune = vrai positif (prédit + vrai)
     """
-    fig, axs = plt.subplots(1, 3, figsize=(18, 6))
+    fig, axs = plt.subplots(1, 4, figsize=(24, 6))
 
     image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
@@ -68,7 +74,7 @@ def afficher_masques(image, gt_mask, pred_mask):
     axs[0].set_title("Image originale")
     axs[0].axis('off')
 
-    # Superposition GT (vert transparent)
+    # Masque GT
     gt_overlay = image_rgb.copy()
     green = np.array([0, 255, 0], dtype=np.uint8)
     gt_overlay[gt_mask == 1] = 0.5 * gt_overlay[gt_mask == 1] + 0.5 * green
@@ -76,13 +82,31 @@ def afficher_masques(image, gt_mask, pred_mask):
     axs[1].set_title("Masque Vérité Terrain (vert)")
     axs[1].axis('off')
 
-    # Superposition prédiction (rouge transparent)
+    # Masque prédiction
     pred_overlay = image_rgb.copy()
     red = np.array([255, 0, 0], dtype=np.uint8)
     pred_overlay[pred_mask == 1] = 0.5 * pred_overlay[pred_mask == 1] + 0.5 * red
     axs[2].imshow(pred_overlay.astype(np.uint8))
-    axs[2].set_title("Masque de Prédiction (rouge)")
+    axs[2].set_title("Masque Prédiction (rouge)")
     axs[2].axis('off')
+
+    # Superposition combinée
+    fusion = image_rgb.copy()
+    jaune = np.array([255, 255, 0], dtype=np.uint8)  # TP = jaune
+    vert = np.array([0, 255, 0], dtype=np.uint8)     # FN = vert seul
+    rouge = np.array([255, 0, 0], dtype=np.uint8)    # FP = rouge seul
+
+    tp = (gt_mask == 1) & (pred_mask == 1)
+    fn = (gt_mask == 1) & (pred_mask == 0)
+    fp = (gt_mask == 0) & (pred_mask == 1)
+
+    fusion[tp] = 0.5 * fusion[tp] + 0.5 * jaune
+    fusion[fn] = 0.5 * fusion[fn] + 0.5 * vert
+    fusion[fp] = 0.5 * fusion[fp] + 0.5 * rouge
+
+    axs[3].imshow(fusion.astype(np.uint8))
+    axs[3].set_title("Fusion : Vert=FN, Rouge=FP, Jaune=TP")
+    axs[3].axis('off')
 
     plt.tight_layout()
     plt.show()
