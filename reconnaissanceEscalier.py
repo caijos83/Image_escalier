@@ -85,7 +85,8 @@ def draw_hough_lines(img, lines, color=(0, 0, 255), thickness=2):
 def getDegree(x1, y1, x2, y2):
     dy = y2 - y1
     dx = x2 - x1
-
+    if dx == 0:
+        return 90.0 if dy > 0 else -90.0
     angle_rad = math.atan(dy/dx)
 
     angle_deg = math.degrees(angle_rad)

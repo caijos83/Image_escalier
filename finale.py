@@ -20,7 +20,7 @@ def main():
     annotations_v1 = "Annotations_v1"      # Résultats du traitement v1
     annotations_v2 = "Annotations_v2"      # Résultats du traitement v2
     annotations_final = "Annotations_final" # Fusion des deux
-    seuil_iou = 0.6
+    seuil_iou = 0.5
 
     # Étape 1: traitement initial (version Gaussian)
     print("===== Traitement v1 =====")
@@ -168,7 +168,9 @@ def main():
 
     # Étape 6: statistiques IoU
     print("\n===== Statistiques IoU =====")
-    ious = []
+    ious_total = []
+    ious_succes = []
+    ious_echecs = []
     for img in images:
         nom = os.path.splitext(img)[0]
         gt_json = os.path.join(dossier_jsons_gt, f"{nom}.json")
@@ -180,9 +182,16 @@ def main():
         gt_mask = load_ground_truth_mask(gt_json, image.shape)
         pred_mask = load_ground_truth_mask(pred_json, image.shape)
         scores = calcul_metrique(gt_mask, pred_mask)
-        ious.append(scores['IoU'])
-    if ious:
-        print(f"IoU moyen : {np.mean(ious):.4f} (n={len(ious)})")
+        iou = scores['IoU']
+        ious_total.append(iou)
+        if iou >= seuil_iou: 
+            ious_succes.append(iou)
+        else:
+            ious_echecs.append(iou)
+    if ious_total:
+        print(f"IoU moyen total   : {np.mean(ious_total):.4f} (n={len(ious_total)})")
+        print(f"IoU moyen succès  : {np.mean(ious_succes):.4f} (n={len(ious_succes)})")
+        print(f"IoU moyen échecs  : {np.mean(ious_echecs):.4f} (n={len(ious_echecs)})")
     else:
         print("Aucun IoU calculé.")
 
