@@ -199,23 +199,22 @@ def get_corners_from_lines(lines):
 
 
 # === Main ===
-image_path = "Base_Validation\\16.jpg"
+image_path = "Base_Validation\\18.jpg"
 
 # 1. Otsu + récupération image niveaux de gris
 binary_image, gray_img = algo_otsu(image_path)
-
+equalized = cv2.equalizeHist(gray_img)
 # 2. Appliquer flou gaussien et Canny
 gaussien = cv2.GaussianBlur(gray_img, (7, 7), 0)
-contour = cv2.Canny(gaussien, 100, 180)
+contour = cv2.Canny(equalized, 100, 180)
 
 noyau= np.ones((3, 3), np.uint8)
-dilated_contour = cv2.dilate(gaussien,noyau, iterations=4)
+dilated_contour = cv2.dilate(contour,noyau, iterations=4)
 closed_contour = cv2.erode(dilated_contour, noyau, iterations=3)
 
 # 3. Redimensionner et afficher avec OpenCV
-resized_contour = cv2.resize(closed_contour, (600, 600))
+resized_contour = cv2.resize(equalized, (600, 600))
 cv2.imshow("Contours closed",resized_contour)
-
 
 # 4.
 width = contour.shape[1]

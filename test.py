@@ -185,7 +185,7 @@ def get_rectangle_from_lines(lines):
 
 def traiter_dossier(dossier_images, dossier_annotations):
     os.makedirs(dossier_annotations, exist_ok=True)
-    fichiers = sorted([f for f in os.listdir(dossier_images) if f.endswith('2.jpg')])
+    fichiers = sorted([f for f in os.listdir(dossier_images) if f.endswith('.jpg')])
 
     for fichier in fichiers:
         image_path = os.path.join(dossier_images, fichier)
@@ -241,5 +241,5 @@ def traiter_dossier(dossier_images, dossier_annotations):
 dossier_images = "Base_Validation"
 dossier_annotations = "Annotations"
 
-# traiter_dossier(dossier_images, dossier_annotations)
+traiter_dossier(dossier_images, dossier_annotations)
 
