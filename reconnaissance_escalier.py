@@ -4,6 +4,11 @@ import numpy as np
 import cv2
 import matplotlib.pyplot as plt
 
+
+
+
+
+
 # =========================
 #      GÉNÉRATION MASQUES
 # =========================
@@ -156,7 +161,7 @@ def evaluation_globale(dossier_images, dossier_jsons_gt, dossier_jsons_pred, seu
     - Calcule le pourcentage d'escaliers correctement détectés (IoU > seuil).
     """
 
-    fichiers = sorted([f for f in os.listdir(dossier_images) if f.endswith('47.jpg')])
+    fichiers = sorted([f for f in os.listdir(dossier_images) if f.endswith('93.jpg')])
 
     total_images = 0
     escaliers_detectes = 0
