@@ -4,6 +4,9 @@ import numpy as np
 import cv2
 import matplotlib.pyplot as plt
 
+"""
+Ce fichier python s'occupe seulement de faire une évaluation globale et de calculer les métriques 
+"""
 
 # =========================
 #      GÉNÉRATION MASQUES
@@ -124,7 +127,8 @@ def evaluation_globale(dossier_images, dossier_jsons_gt, dossier_jsons_pred, seu
     - Calcule le pourcentage d'escaliers correctement détectés (IoU > seuil).
     """
 
-    fichiers = sorted([f for f in os.listdir(dossier_images) if f.endswith('.jpg')])
+    valid_ext = ('.jpg', '.jpeg', '.png')
+    fichiers = sorted([f for f in os.listdir(dossier_images) if f.endswith(valid_ext)])
 
     total_images = 0
     escaliers_detectes = 0
@@ -148,7 +152,7 @@ def evaluation_globale(dossier_images, dossier_jsons_gt, dossier_jsons_pred, seu
         for metrique, valeur in scores.items():
             print(f"  {metrique} : {valeur:.4f}")
 
-        #afficher_masques(image, gt_mask, pred_mask)
+        # afficher_masques(image, gt_mask, pred_mask)
         iou = scores['IoU']
 
         total_images += 1

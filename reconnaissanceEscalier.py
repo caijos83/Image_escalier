@@ -6,6 +6,10 @@ import json
 import math
 import os
 
+"""
+Ce fichier python regroupe les fonctions de traitement des images,
+tels que Otsu, canny, fermeture etc
+"""
 
 def image_gray(image_path):
     """
@@ -141,6 +145,9 @@ def getLinesP(img,width):
                         threshold=75,         # au moins les points existent
                         minLineLength=width/6,   
                         maxLineGap=20)
+    if houghLines is None:
+        # pas de ligne du tout : on ne boucle pas et on renvoie vide
+        return []
     lines=merge_similar_lines(houghLines)
     total=0
     nb=0
@@ -170,27 +177,27 @@ def getLinesP(img,width):
 
 def get_corners_from_lines(lines):
     """
-    通过线段端点直接定位四个角点
-    :param lines: 线段列表，格式为 [np.array([[x1,y1,x2,y2]]), ...]
-    :return: 四个角点坐标 (top_left, top_right, bottom_left, bottom_right)
+    utilise les lignes pour trouvé 4 points
+    :param lines:  [np.array([[x1,y1,x2,y2]]), ...]
+    :return: les coordonnées des 4 poins (top_left, top_right, bottom_left, bottom_right)
     """
-    # 将所有端点展平为点列表
+
     all_points = []
     for line in lines:
         x1, y1, x2, y2 = line[0]
         all_points.extend([(x1, y1), (x2, y2)])
 
 
-    # 去重处理
+    
     unique_points = list(set(all_points))
 
-    # 定义角落评分规则
-    def score_lt(p): return p[0] + p[1]     # 左上角评分 (x+y 最小)
-    def score_rt(p): return p[0] - p[1]     # 右上角评分 (x-y 最大)
-    def score_lb(p): return p[0] - p[1]     # 左下角评分 (x-y 最小)
-    def score_rb(p): return p[0] + p[1]     # 右下角评分 (x+y 最大)
 
-    # 找到最符合每个角落特征的点
+    def score_lt(p): return p[0] + p[1]     # en haut à gauche x+y le plus petit
+    def score_rt(p): return p[0] - p[1]     # en haut à droit x-y le plus grand
+    def score_lb(p): return p[0] - p[1]     # en bas à gauche (x-y le plus petit)
+    def score_rb(p): return p[0] + p[1]     # en bas à droite (x+y led plus grand)
+
+
     top_left     = min(unique_points, key=lambda p: score_lt(p))
     top_right    = max(unique_points, key=lambda p: score_rt(p))
     bottom_left  = min(unique_points, key=lambda p: score_lb(p))
@@ -233,7 +240,9 @@ def get_rectangle_from_lines(lines):
 
 def traiter_dossier_v1(dossier_images, dossier_annotations):
     os.makedirs(dossier_annotations, exist_ok=True)
-    fichiers = sorted([f for f in os.listdir(dossier_images) if f.endswith('.jpg')])
+    valid_ext = ('.jpg', '.jpeg', '.png')
+
+    fichiers = sorted([f for f in os.listdir(dossier_images) if f.endswith(valid_ext)])
 
     for fichier in fichiers:
         image_path = os.path.join(dossier_images, fichier)
@@ -245,7 +254,9 @@ def traiter_dossier_v1(dossier_images, dossier_annotations):
         binary_image, gray_img = algo_otsu(image_path)
 
         gaussien = cv2.GaussianBlur(gray_img, (7, 7), 0)
-        contour = cv2.Canny(gaussien, 100, 180)
+        # contour = cv2.Canny(gaussien, 100, 180)
+        contour = cv2.Canny(gaussien, 50, 150)
+
         noyau = np.ones((3, 3), np.uint8)
         dilated_contour = cv2.dilate(contour, noyau, iterations=3)
 
@@ -284,7 +295,8 @@ def traiter_dossier_v1(dossier_images, dossier_annotations):
 
 def traiter_dossier_v2(dossier_images, dossier_annotations):
     os.makedirs(dossier_annotations, exist_ok=True)
-    fichiers = sorted([f for f in os.listdir(dossier_images) if f.endswith('.jpg')])
+    valid_ext = ('.jpg', '.jpeg', '.png')
+    fichiers = sorted([f for f in os.listdir(dossier_images) if f.endswith(valid_ext)])
 
     for fichier in fichiers:
         image_path = os.path.join(dossier_images, fichier)

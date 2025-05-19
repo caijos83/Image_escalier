@@ -11,11 +11,15 @@ from evaluation import (
     calcul_metrique,
     evaluation_globale
 )
+"""
+Ce fichier python regroupe les fonctions du reconnaissanceEscalier.py, 
+et de evaluation.py afin de pouvoir faire une évaluation compléte.
+"""
 
 
 def main():
     # Dossiers et paramètres
-    dossier_images = "Base_Validation"
+    dossier_images = "Base_Test"        # Dossier image à traiter
     dossier_jsons_gt = "json"               # Vérité terrain
     annotations_v1 = "Annotations_v1"      # Résultats du traitement v1
     annotations_v2 = "Annotations_v2"      # Résultats du traitement v2
@@ -28,7 +32,8 @@ def main():
 
     # Étape 2: détection des images échouées (IoU < seuil)
     print("\n===== Sélection des échecs =====")
-    images = sorted([f for f in os.listdir(dossier_images) if f.endswith('.jpg')])
+    valid_ext = ('.jpg', '.jpeg', '.png')
+    images = sorted([f for f in os.listdir(dossier_images) if f.endswith(valid_ext)])
     images_echouees = []
 
     for img in images:
@@ -86,84 +91,6 @@ def main():
     print("\n===== Évaluation globale finale =====")
     evaluation_globale(dossier_images, dossier_jsons_gt, annotations_final, seuil_iou)
 
-
-
-    # Étape 6: calcul des moyennes des IoU
-    # print("\n===== Statistiques IoU =====")
-    # ious_total = []
-    # ious_succes = []
-    # ious_echecs = []
-    # for img in images:
-        # nom = os.path.splitext(img)[0]
-        # gt_json = os.path.join(dossier_jsons_gt, f"{nom}.json")
-        # pred_json = os.path.join(annotations_final, f"{nom}.json")
-        # if not os.path.exists(gt_json) or not os.path.exists(pred_json):
-            # continue
-        # image_path = os.path.join(dossier_images, img)
-        # image = cv2.imread(image_path)
-        # gt_mask = load_ground_truth_mask(gt_json, image.shape)
-        # pred_mask = load_ground_truth_mask(pred_json, image.shape)
-        # scores = calcul_metrique(gt_mask, pred_mask)
-        # iou = scores['IoU']
-        # ious_total.append(iou)
-        # if iou >= seuil_iou:
-            # ious_succes.append(iou)
-        # else:
-            # ious_echecs.append(iou)
-    # if ious_total:
-        # print(f"IoU moyen total   : {np.mean(ious_total):.4f} (n={len(ious_total)})")
-        # print(f"IoU moyen succès  : {np.mean(ious_succes):.4f} (n={len(ious_succes)})")
-        # print(f"IoU moyen échecs  : {np.mean(ious_echecs):.4f} (n={len(ious_echecs)})")
-    # else:
-        # print("Aucun IoU calculé.")
-
-
-
-
-
-    # Étape 6: statistiques IoU et MAE
-    # print("\n===== Statistiques IoU et MAE =====")
-    # ious_total = []
-    # ious_succes = []
-    # ious_echecs = []
-    # maes_total = []
-    # maes_succes = []
-    # maes_echecs = []
-
-    # for img in images:
-        # nom = os.path.splitext(img)[0]
-        # gt_json = os.path.join(dossier_jsons_gt, f"{nom}.json")
-        # pred_json = os.path.join(annotations_final, f"{nom}.json")
-        # if not os.path.exists(gt_json) or not os.path.exists(pred_json):
-            # continue
-        # image_path = os.path.join(dossier_images, img)
-        # image = cv2.imread(image_path)
-        # gt_mask = load_ground_truth_mask(gt_json, image.shape)
-        # pred_mask = load_ground_truth_mask(pred_json, image.shape)
-        # scores = calcul_metrique(gt_mask, pred_mask)
-        # iou = scores['IoU']
-        # mae = np.mean(np.abs(gt_mask.astype(np.float32) - pred_mask.astype(np.float32)))
-
-        # Collecte
-        # ious_total.append(iou)
-        # maes_total.append(mae)
-        # if iou >= seuil_iou:
-            # ious_succes.append(iou)
-            # maes_succes.append(mae)
-        # else:
-            # ious_echecs.append(iou)
-            # maes_echecs.append(mae)
-
-    # Affichage moyennes
-    # if ious_total:
-        # print(f"IoU moyen total   : {np.mean(ious_total):.4f} (n={len(ious_total)})")
-        # print(f"IoU succès moyen  : {np.mean(ious_succes):.4f} (n={len(ious_succes)})")
-        # print(f"IoU échecs moyen  : {np.mean(ious_echecs):.4f} (n={len(ious_echecs)})")
-        # print(f"MAE moyen total   : {np.mean(maes_total):.4f}")
-        # print(f"MAE succès moyen  : {np.mean(maes_succes):.4f}")
-        # print(f"MAE échecs moyen  : {np.mean(maes_echecs):.4f}")
-    # else:
-        # print("Aucune statistique calculée.")
 
 
     # Étape 6: statistiques IoU
