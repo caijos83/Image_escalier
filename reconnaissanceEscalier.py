@@ -11,10 +11,10 @@ Ce fichier python regroupe les fonctions de traitement des images,
 tels que Otsu, canny, fermeture etc
 """
 
+"""
+Convertit une image couleur en niveaux de gris en utilisant la formule de luminance.
+"""
 def image_gray(image_path):
-    """
-    Convertit une image couleur en niveaux de gris en utilisant la formule de luminance.
-    """
     img = mplimg.imread(image_path)
 
     if img.dtype == np.float32 or img.dtype == np.float64:
@@ -23,7 +23,6 @@ def image_gray(image_path):
     gray_image = np.dot(img[..., :3], [0.299, 0.587, 0.114])
 
     return gray_image.astype(np.uint8)
-
 
 def algo_otsu(image_path):
     """
@@ -60,8 +59,6 @@ def algo_otsu(image_path):
 
 
 
-
-
 def draw_hough_lines(img, lines, color=(0, 0, 255), thickness=2):
     """
         Dessine les segments de lignes détectés par HoughLinesP sur l'image.
@@ -85,7 +82,9 @@ def draw_hough_lines(img, lines, color=(0, 0, 255), thickness=2):
 
     return img_with_lines
 
-    
+"""
+Calcule l’angle d’inclinaison d’une ligne en degrés par rapport à l’axe horizontal.
+"""    
 def getDegree(x1, y1, x2, y2):
     dy = y2 - y1
     dx = x2 - x1
@@ -98,6 +97,9 @@ def getDegree(x1, y1, x2, y2):
 
     return angle_deg
 
+"""
+Calcule l’angle absolu (0–360°) entre deux points (vecteur).
+"""
 def get_angle(x1, y1, x2, y2):
     angle_rad = math.atan2(y2 - y1, x2 - x1)
     angle_deg = math.degrees(angle_rad)
@@ -105,6 +107,9 @@ def get_angle(x1, y1, x2, y2):
         angle_deg += 360
     return angle_deg
 
+"""
+Regroupe les lignes similaires en fonction de leur orientation et proximité.
+"""
 def merge_similar_lines(lines, angle_threshold=5, distance_threshold=20):
     merged = []
     mergedLines=[]
@@ -135,9 +140,15 @@ def merge_similar_lines(lines, angle_threshold=5, distance_threshold=20):
 
     return mergedLines
 
+"""
+Trie les lignes par la coordonnée Y de leur premier point.
+"""
 def sort_lines_by_y1(lines):
     return sorted(lines, key=lambda line: line[0][1])
 
+"""
+Détecte les lignes à l'aide de HoughLinesP et filtre celles pertinentes.
+"""
 def getLinesP(img,width):
     houghLines = cv2.HoughLinesP(img, 
                         rho=1,                      # la précision en distance, en pixels
